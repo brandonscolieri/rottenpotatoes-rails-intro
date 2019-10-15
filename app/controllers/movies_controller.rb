@@ -1,58 +1,5 @@
 class MoviesController < ApplicationController
 
-  # @all_ratings = getUniqueRatingCategories()
-
-  def getUniqueRatingCategories() # eg. should return ratings column unique values like so ['PG-13', 'G', 'PG', 'R']
-    return Movie.distinct.pluck(:rating)
-  end
-
-  def sortColumnAscending?(columnName = params[:sortASC])
-    if params[:sortASC]
-      @movies = Movie.order(params[:sortASC])
-    else
-      @movies = filterByRatings() #Movie.all
-    end
-  end
-
-  # def sortColumnAscending?(columnName = params[:sortASC])
-  #   filteredMovies = filterByRatings()
-  #   if params[:sortASC]
-  #     @movies = filteredMovies.order(params[:sortASC])
-  #   end
-  # end
-
-  # def sortColumnAscending(columnName = params[:sortASC])
-  #   filterByRatings()
-    # @movies = @movies.where(rating: @selectedRatings).order("title")
-    # @movies = @movies[3]
-    # if params[:sortASC]
-    #   filterByRatings()
-    #   @movies = @movies.order(columnName)
-    # end
-  # end
-
-  def initializeFilters()
-    isSelected = 1
-    @all_ratings = getUniqueRatingCategories()
-    @selectedRatings = @all_ratings
-    if params[:ratings]
-      @selectedRatings = params[:ratings].keys
-    end
-    @selectedRatings.each do |rating|
-      params[rating] = isSelected
-    end
-  end
-
-  def filterByRatings
-    initializeFilters()
-    @movies = Movie.where(rating: @selectedRatings)
-    if params[:sortASC]
-      @movies = @movies.order(params[:sortASC])
-    end
-    return @movies
-  end
-
-
   def movie_params
     params.require(:movie).permit(:title, :rating, :description, :release_date)
   end
@@ -64,9 +11,11 @@ class MoviesController < ApplicationController
   end
 
   def index
-    # @all_ratings = getUniqueRatingCategories()
-    # sortColumnAscending()
-    filterByRatings() 
+    initializeState()
+    if isStateSynced() == false
+      flash.keep
+      redirect_to(movies_path(:sortASC => @sortASC, :ratings => @ratings))
+    end
   end
 
   def new
@@ -98,8 +47,39 @@ class MoviesController < ApplicationController
   end
 
 
+  def getUniqueRatingCategories() # eg. should return ratings column unique values like so ['PG-13', 'G', 'PG', 'R']
+    return Movie.distinct.pluck(:rating)
+  end
 
 
+  def initializeRatingFilters()
+    isSelected = 1
+    @selectedRatingsHash = {}
+    @all_ratings = getUniqueRatingCategories() #Rating Categories
 
+    @all_ratings.each do |rating| 
+      @selectedRatingsHash[rating] = isSelected
+    end
+    return @selectedRatingsHash
+  end
+
+
+  def initializeState()
+    initializeRatingFilters()
+    @ratings = params[:ratings] || session[:ratings] || @selectedRatingsHash
+    @sortASC = params[:sortASC] || session[:sortASC] || nil
+    session[:sortASC] = @sortASC
+    session[:ratings] = @ratings
+    @movies = Movie.where(:rating => @ratings.keys).order(@sortASC)
+  end
+
+
+  def isStateSynced
+    if params[:sortASC] == session[:sortASC] and params[:ratings] == session[:ratings]
+      return true
+    else
+      return false
+    end
+  end
 
 end
